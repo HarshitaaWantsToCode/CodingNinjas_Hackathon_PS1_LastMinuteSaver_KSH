@@ -5,16 +5,15 @@
 
 import { AIProvider, AIResponse } from "./AIProvider";
 import { GeminiProvider } from "./GeminiProvider";
-import { LocalLlamaProvider } from "./LocalLlamaProvider";
+import type { LocalLlamaProvider } from "./LocalLlamaProvider";
 
 export class HybridAIProvider implements AIProvider {
   private geminiProvider: GeminiProvider;
-  private localLlamaProvider: LocalLlamaProvider;
+  private localLlamaProvider: LocalLlamaProvider | null = null;
   private isLlamaInitialized = false;
 
   constructor() {
     this.geminiProvider = new GeminiProvider();
-    this.localLlamaProvider = new LocalLlamaProvider();
   }
 
   private llamaInitPromise: Promise<void> | null = null;
@@ -25,6 +24,10 @@ export class HybridAIProvider implements AIProvider {
 
     this.llamaInitPromise = (async () => {
       try {
+        if (!this.localLlamaProvider) {
+          const { LocalLlamaProvider } = await import("./LocalLlamaProvider");
+          this.localLlamaProvider = new LocalLlamaProvider();
+        }
         await this.localLlamaProvider.initialize();
         this.isLlamaInitialized = true;
         console.log("✓ Local Llama loaded successfully on demand.");
@@ -59,7 +62,7 @@ export class HybridAIProvider implements AIProvider {
 
   async healthCheck(): Promise<boolean> {
     const geminiStatus = await this.geminiProvider.healthCheck();
-    const llamaStatus = await this.localLlamaProvider.healthCheck();
+    const llamaStatus = this.localLlamaProvider ? await this.localLlamaProvider.healthCheck() : false;
     return geminiStatus || llamaStatus;
   }
 
@@ -73,16 +76,16 @@ export class HybridAIProvider implements AIProvider {
       } catch (geminiError: any) {
         console.warn(`Gemini unavailable (${geminiError.message || 'Error'}). Switching to Local Llama fallback...`);
         await this.ensureLlamaInitialized();
-        return await this.localLlamaProvider.generate(prompt, systemInstruction);
+        return await this.localLlamaProvider!.generate(prompt, systemInstruction);
       }
     } else {
       // Direct Local Llama Mode
       await this.ensureLlamaInitialized();
-      return await this.localLlamaProvider.generate(prompt, systemInstruction);
+      return await this.localLlamaProvider!.generate(prompt, systemInstruction);
     }
   }
 
-  getLlamaProvider(): LocalLlamaProvider {
+  getLlamaProvider(): LocalLlamaProvider | null {
     return this.localLlamaProvider;
   }
 

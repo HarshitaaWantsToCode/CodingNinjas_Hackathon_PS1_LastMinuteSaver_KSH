@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getLlama, LlamaModel, LlamaContext, LlamaChatSession } from "node-llama-cpp";
+import type { LlamaModel, LlamaContext, LlamaChatSession } from "node-llama-cpp";
 import path from "path";
 import { AIProvider, AIResponse } from "./AIProvider";
 
@@ -19,7 +19,8 @@ export class LocalLlamaProvider implements AIProvider {
     const modelPath = path.join(process.cwd(), "agent", "llama-3-maal-8b-instruct-v0.1.Q4_K_M.gguf");
     console.log(`Loading local Llama GGUF Model from ${modelPath}...`);
     try {
-      this.llama = await getLlama({ gpu: false });
+      const llamaCpp = await new Function("return import('node-llama-cpp')")();
+      this.llama = await llamaCpp.getLlama({ gpu: false });
       this.model = await this.llama.loadModel({ modelPath });
       this.context = await this.model.createContext();
       this.isLoaded = true;
@@ -42,7 +43,8 @@ export class LocalLlamaProvider implements AIProvider {
 
     const startTime = Date.now();
     try {
-      const session = new LlamaChatSession({
+      const llamaCpp = await new Function("return import('node-llama-cpp')")();
+      const session = new llamaCpp.LlamaChatSession({
         contextSequence: this.context.getSequence(),
         systemPrompt: systemInstruction
       });
